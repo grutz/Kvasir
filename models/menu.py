@@ -116,10 +116,14 @@ response.menu = [
               (T('List Vulnerabilities'), False, URL(_a,'vulns','vulndata_list'),[]),
               (T('Add Vulnerability'), False, URL(_a,'vulns','vulndata_add'),[]),
               (T('List References'), False, URL(_a,'vulns','vuln_references_list'),[]),
+          ]),
+         (T('Exploits'), False, '',
+          [
               (T('List Exploits'), False, URL(_a,'exploits','list'),[]),
               (T('Connect Vulns/Exploits'), False, URL(_a,'exploits','connect_exploits'), []),
               (T('Import Nexpose Exploits'), False, URL(_a,'exploits','import_nexpose_xml'),[]),
               (T('Import CANVAS Exploits'), False, URL(_a,'exploits','import_canvas_xml'),[]),
+              (T('Import CORE Impact Exploits'), False, URL(_a,'exploits','import_core_impact'),[]),
           ]),
          (T('CPE Database'), False, '',
           [

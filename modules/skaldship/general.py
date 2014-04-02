@@ -14,19 +14,9 @@ __version__ = "1.0"
 ##--------------------------------------#
 """
 
-
-from gluon import current
 import logging
 logger = logging.getLogger("web2py.app.kvasir")
 
-#db = current.globalenv['db']
-#cache = current.globalenv['cache']
-
-##-------------------------------------------------------------------------
-
-def utf_8_decoder(unicode_data):
-    for line in unicode_data:
-        yield line.decode('utf-8')
 
 ##-------------------------------------------------------------------------
 
@@ -54,6 +44,21 @@ def severity_mapping(sevnum='1', totype='color'):
 def vulntype_mapping(vulntype='exploited'):
     """
     Converts a vulnerability type to a color.
+
+    >>> vulntype_mapping('potential')
+    'grey'
+
+    >>> vulntype_mapping('vulnerable-version')
+    'green'
+
+    >>> vulntype_mapping('vulnerable-exploited')
+    'orange'
+
+    >>> vulntype_mapping('exploited')
+    'red'
+
+    >>> vulntype_mapping('doesnotexist')
+    'grey'
     """
     vulnmap = {
         'potential': 'grey',
@@ -62,9 +67,20 @@ def vulntype_mapping(vulntype='exploited'):
         'exploited': 'red',
     }
 
+    if vulntype in vulnmap:
+        mapping = vulnmap[vulntype]
+    else:
+        mapping = 'grey'
+
+    return mapping
+
+
 ##-------------------------------------------------------------------------
 
 def cvss_metrics(record):
+    """
+    Converts a record's cvss fields to a string
+    """
     if record is None:
         return "NO RECORD SUBMITTED"
 
@@ -75,13 +91,17 @@ def cvss_metrics(record):
                                                  record.f_cvss_i,
                                                  record.f_cvss_a)
 
+
 ##-------------------------------------------------------------------------
 
 def vuln_data(vuln, html=True, full=True):
-    """Returns a dict of all useful vulnerability data from a record,
-    including printable cvss, references and exploits"""
+    """
+    Returns a dict of all useful vulnerability data from a record,
+    including printable cvss, references and exploits
+    """
 
     from gluon.contrib.markmin.markmin2html import markmin2html
+    from gluon import current
 
     db = current.globalenv['db']
     cache = current.globalenv['cache']
@@ -140,63 +160,6 @@ def vuln_data(vuln, html=True, full=True):
                 vuln.f_pci_sev,
                )
 
-##-------------------------------------------------------------------------
-
-def make_good_url(url, addition="/"):
-    """Appends addition to url, ensuring the right number of slashes
-    exist and the path doesn't get clobbered"""
-
-    if url is None:
-        return None
-
-    if addition[0] == "/":
-        addition = addition.lstrip('/')
-    urlpath = urlsplit(url)[2]
-    if urlpath[len(urlpath)-1] == '/':
-        url = urljoin(url, addition)
-    else:
-        url = urljoin(url, '/'+addition)
-    return url
-
-##-------------------------------------------------------------------------
-
-def encode_url_for_xml(url):
-    """
-    Replaces special characters that XML doesn't like to see in URLs
-    """
-    if type(url) is not type(str()):
-        return
-
-    url = url.replace('&', '&amp;')
-    url = url.replace('<', '&lt;')
-    url = url.replace('>', '&gt;')
-    url = url.replace('"', '%22')
-    return url
-
-##-------------------------------------------------------------------------
-
-def get_url(options={}):
-    """Connect to options['url'] and retrieve data"""
-    if options.has_key('url') is None:
-        return ""
-    if options.has_key('username'):
-        # add basic auth header
-        key = base64.b64encode(options['username']+':'+options.get('password',''))
-        headers = {'Authorization': 'Basic ' + key}
-    else:
-        headers = None
-
-    values = { 'desc': options.get('type', ''),
-               'description': options.get('name', '') }
-    data = urllib.urlencode(values)
-
-    try:
-        req = urllib2.Request(options['url'], data, headers)
-        response = urllib2.urlopen(req)
-    except urllib2.URLError, e:
-        raise Exception(e)
-
-    return response.read()
 
 ##-------------------------------------------------------------------------
 
@@ -211,6 +174,7 @@ def get_oreally_404(rfolder):
         files = os.listdir(imgdir)
         return choice(files)
 
+
 ##-------------------------------------------------------------------------
 
 def html_to_markmin(html):
@@ -218,11 +182,14 @@ def html_to_markmin(html):
     Replace HTML with Markmin, converting unicode to references first
 
     >>> html_to_markmin('<p class="foo"><b>Bold</b><i>Italics</i><ol><li>Item 1</li><li><a href="http://kvasir.io">Kvasir</a></li></ol><br>')
-    "**Bold**''Italics''\n- Item 1\n- [[Kvasir http://kvasir.io]]\n\n\n\n"
+    "**Bold**''Italics''\\n- Item 1\\n- [[Kvasir http://kvasir.io]]\\n\\n\\n\\n"
+
     >>> html_to_markmin(u'<p>asdfsadf</p>')
-    'asdfsadf\n\n'
+    'asdfsadf\\n\\n'
+
     >>> html_to_markmin(u'<p>\ufffdq\ufffd</p>')
-    '\xef\xbf\xbdq\xef\xbf\xbd\n\n'
+    '\xef\xbf\xbdq\xef\xbf\xbd\\n\\n'
+
     >>> html_to_markmin('[[ a link http://url.com]]')
     '[[a link http://url.com]]'
     """
@@ -234,6 +201,7 @@ def html_to_markmin(html):
     html = html.replace('[[ ', '[[')                      # fix bad url
     html = html.replace(' ]]', ']]')                      # fix bad url
     return html
+
 
 ##-------------------------------------------------------------------------
 
@@ -261,6 +229,7 @@ def check_datadir(folder=None):
 
     return True
 
+
 ##-------------------------------------------------------------------------
 
 def exploitdb_update(indexfile):
@@ -271,6 +240,7 @@ def exploitdb_update(indexfile):
         return "No file sent to process"
 
     import csv
+    from gluon import current
     db = current.globalenv['db']
 
     db.t_exploitdb.truncate()
@@ -298,6 +268,78 @@ def exploitdb_update(indexfile):
         message = 'Load complete: %s records created' % (count)
 
     return message
+
+
+##-------------------------------------------------------------------------
+
+def cve_fixup(cve):
+    """
+    Fix a provided CVE to ensure it meets CVE standards (CVE-YYYY-ZZZZ)
+
+    >>> cve_fixup(None)
+
+    >>> cve_fixup('CVE-12345-1234567')
+
+    >>> cve_fixup('cep-1000-1234')
+
+    >>> cve_fixup('cve-2001-1234567')
+    'CVE-2001-1234567'
+
+    >>> cve_fixup('cve-1999-1234')
+    'CVE-1999-1234'
+
+    >>> cve_fixup('1999-1234')
+    'CVE-1999-1234'
+
+    >>> cve_fixup('CVE-1999-123')
+    'CVE-1999-0123'
+
+    """
+    if not isinstance(cve, (str, unicode)):
+        return None
+
+    import re
+    cve_re = re.compile("CVE-\d{4}-\d{4,7}$")
+
+    # some basic 'fixups'
+    cve = cve.upper()
+    cve = cve.strip()
+    if not cve.startswith('CVE-'):
+        cve = "CVE-%s" % (cve)
+
+    while not cve_re.match(cve):
+        # remove any duplicate --
+        cve = re.sub('\-+', '-', cve)
+        cve = re.sub('(CPE\-)+', 'CPE-', cve)
+
+        # try some fixes until we run out
+        if cve.count('-') == 2:
+            # we have the requisite dashes, lets figure out numerical count and can we fix it?
+            (nom, yr, numbr) = cve.split('-')[0:3]
+            if len(yr) < 4:
+                yr = yr.zfill(4)
+            if len(numbr) < 4:
+                numbr = numbr.zfill(4)
+            cve = '-'.join([nom, yr, numbr])
+            if not cve_re.match(cve):
+                # still not good, lets skeedaddle
+                logger.warn('Couldnt fix %s' % (cve))
+                return None
+
+        elif cve.count('CVE-') > 1:
+            # multiple CVE- strings:
+            pass
+
+        elif cve_re.match(cve):
+            # must be next to last
+            break
+
+        else:
+            # we can't fix it
+            logger.warn('Invalid CVE: %s' % (cve))
+            return None
+
+    return cve
 
 
 ##-------------------------------------------------------------------------
