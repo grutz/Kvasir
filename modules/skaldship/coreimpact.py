@@ -66,7 +66,7 @@ def process_exploits(filename=None):
 
     for line in reader:
         # CVE | Description | Number | Exploit Name | Date
-        if len(line) != 6:
+        if len(line) != 5:
             log("Not enough values in line", logging.WARN)
             continue
 

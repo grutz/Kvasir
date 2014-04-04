@@ -21,7 +21,7 @@ from gluon import current
 
 ##-------------------------------------------------------------------------
 
-def add_or_update(hostfields, update=False):
+def add_or_update(hostfields={}, update=False, metahost=False):
     """
     Add a host and return the record. If update is True and host already exists
     then the record is updated and returned
@@ -30,9 +30,14 @@ def add_or_update(hostfields, update=False):
         log(" [!] Hostfields is not a dictionary", logging.ERROR)
         return None
 
-    host_rec = db(db.t_hosts.f_ipv4 == hostfields.get('f_ipv4'))
+    from skaldship.hosts import get_host_record
+    if metahost:
+        # generate a 0.0.0.0 metahost
+        host_rec = get_host_record('0.0.0.0')
+
+    host_rec = get_host_record(hostfields.get('f_ipv4'))
     if not host_rec:
-        host_rec = db(db.t_hosts.f_ipv4 == hostfields.get('f_ipv6'))
+        host_rec = get_host_record(hostfields.get('f_ipv6'))
 
     if not host_rec:
         try:
@@ -162,8 +167,8 @@ def create_hostfilter_query(fdata=[(None, None), False], q=None, dbname=None):
     elif f_type == "ipv4_list":
         if len(f_value) > 0:
             ip_q = (db.t_hosts.f_ipv4 == f_value[0])
-        for host in f_value[1:]:
-            ip_q |= (db.t_hosts.f_ipv4 == host)
+            for host in f_value[1:]:
+                ip_q |= (db.t_hosts.f_ipv4 == host)
         q = q &  ip_q
     elif f_type == "ipv6_list":
         if len(f_value) > 0:
@@ -381,9 +386,9 @@ def pagination(request, curr_host):
         hostindex=hostindex+1
 
     if hostprev == "#":
-        hostprevstyle="display:none";
+        hostprevstyle="display:none"
     if hostnext == "#":
-        hostnextstyle="display:none";
+        hostnextstyle="display:none"
 
     pagination = {}
     pagination['previous'] = A("(p)",_id="prevhostlink" ,_class="button", _href=hostprev, _style=hostprevstyle, _title=hostprevtitle)
