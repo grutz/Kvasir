@@ -1,0 +1,20 @@
+language: python
+python:
+  - "2.7"
+  - "2.6"
+
+# command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
+install: pip install -r requirements.txt --use-mirrors
+
+# setup postgresql
+before_script:
+  - psql -c 'create database kvasir;' -U postgres
+  - git clone https://github.com/web2py/web2py ../web2py
+  - ln -s . ../web2py/applications/kvasir
+  - cd ../web2py/applications/kvasir
+  - cp kvasir.yaml.travis kvasir.yaml
+  - cd ../..
+  - ./web2py -S kvasir -M -R applications/kvasir/private/user.py -A -u test -p test
+
+# command to run tests, e.g. python setup.py test
+script:  nosetests
